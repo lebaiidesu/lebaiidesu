@@ -25,7 +25,6 @@ pipeline {
                           --account-key "$AZ_KEY" \
                           --destination "$AZ_SHARE" \
                           --source . \
-                          --pattern "*.html" \
                           --no-progress
                     '''
                 }
