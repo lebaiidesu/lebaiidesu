@@ -2,32 +2,35 @@ pipeline {
     agent any
 
     environment {
-        SERVERS = "ubuntu@172.31.9.92 ubuntu@172.31.35.152"
-        DOCROOT = "/var/www/html"
+        AZ_ACCOUNT = 'levistore20260721'
+        AZ_SHARE = 'webcontent'
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Deploy') {
+        stage('Deploy to Azure File Share') {
             steps {
-                sshagent(credentials: ['webservers-ssh-key']) {
+                withCredentials([
+                    string(credentialsId: 'azure-storage-key', variable: 'AZ_KEY')
+                ]) {
                     sh '''
-                    for SERVER in $SERVERS
-                    do
-                      rsync -avz --delete \
-                      --rsync-path="sudo rsync" \
-                      ./ $SERVER:$DOCROOT
-
-                      ssh $SERVER "sudo systemctl reload apache2"
-                    done
+                        az storage file upload-batch \
+                          --account-name "$AZ_ACCOUNT" \
+                          --account-key "$AZ_KEY" \
+                          --destination "$AZ_SHARE" \
+                          --source . \
+                          --pattern "*.html" \
+                          --no-progress
                     '''
                 }
             }
         }
+
     }
 }
