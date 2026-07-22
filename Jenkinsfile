@@ -2,8 +2,9 @@ pipeline {
     agent any
 
     environment {
-        AZ_ACCOUNT = 'levistore20260721'
-        AZ_SHARE = 'webcontent'
+        AZ_ACCOUNT = credentials('azure-storage-account')
+        ACI_URL = 'http://stagingaci2026jlf.centralindia.azurecontainer.io'
+        AZ_SHARE = 'website-share'
     }
 
     stages {
@@ -14,22 +15,47 @@ pipeline {
             }
         }
 
-        stage('Deploy to Azure File Share') {
+        stage('Deploy-Staging') {
             steps {
                 withCredentials([
                     string(credentialsId: 'azure-storage-key', variable: 'AZ_KEY')
                 ]) {
                     sh '''
-                        az storage file upload-batch \
+                        az storage file upload \
                           --account-name "$AZ_ACCOUNT" \
                           --account-key "$AZ_KEY" \
-                          --destination "$AZ_SHARE" \
-                          --source . \
-                          --no-progress
+                          --share-name "$AZ_SHARE" \
+                          --source index.html
                     '''
                 }
             }
         }
 
+        stage('Test-Staging') {
+            steps {
+                sh '''
+                    curl -f $ACI_URL > output.html
+                    grep "Version 2" output.html
+                '''
+            }
+        }
+
+        stage('Deploy-Production') {
+            steps {
+                echo 'Staging validation passed.'
+                echo 'Deploying to AWS production servers...'
+            }
+        }
+
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully'
+        }
+
+        failure {
+            echo 'Staging validation failed. Production deployment blocked.'
+        }
     }
 }
