@@ -2,9 +2,12 @@ pipeline {
     agent any
 
     environment {
+        PATH = "/usr/bin:/usr/local/bin:${env.PATH}"
+
         AZ_ACCOUNT = credentials('azure-storage-account')
-        ACI_URL = 'http://stagingaci2026jlf.centralindia.azurecontainer.io'
         AZ_SHARE = 'website-share'
+
+        ACI_URL = 'http://stagingaci2026jlf.centralindia.azurecontainer.io'
     }
 
     stages {
@@ -21,11 +24,12 @@ pipeline {
                     string(credentialsId: 'azure-storage-key', variable: 'AZ_KEY')
                 ]) {
                     sh '''
-                        az storage file upload \
-                          --account-name "$AZ_ACCOUNT" \
-                          --account-key "$AZ_KEY" \
-                          --share-name "$AZ_SHARE" \
-                          --source index.html
+                        /usr/bin/az storage file upload-batch \
+                            --account-name "$AZ_ACCOUNT" \
+                            --account-key "$AZ_KEY" \
+                            --destination "$AZ_SHARE" \
+                            --source . \
+                            --no-progress
                     '''
                 }
             }
@@ -35,6 +39,7 @@ pipeline {
             steps {
                 sh '''
                     curl -f $ACI_URL > output.html
+
                     grep "Version 2" output.html
                 '''
             }
@@ -42,20 +47,35 @@ pipeline {
 
         stage('Deploy-Production') {
             steps {
-                echo 'Staging validation passed.'
-                echo 'Deploying to AWS production servers...'
+                echo "Staging validation successful"
+                echo "Deploying to AWS Production Servers"
+
+                /*
+                Real production deployment example:
+
+                scp index.html ubuntu@WEBSERVER1:/var/www/html/index.html
+                scp index.html ubuntu@WEBSERVER2:/var/www/html/index.html
+                */
+
+                echo "Deployment completed"
             }
         }
 
     }
 
     post {
+
         success {
-            echo 'Pipeline completed successfully'
+            echo "Pipeline completed successfully"
         }
 
         failure {
-            echo 'Staging validation failed. Production deployment blocked.'
+            echo "Staging validation failed"
+            echo "Production deployment blocked"
+        }
+
+        always {
+            cleanWs()
         }
     }
 }
